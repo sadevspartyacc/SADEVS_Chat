@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Chat</title>
+    <style>
+        #chatbox {
+            height: 300px;
+            border: 1px solid #ccc;
+            overflow-y: scroll;
+            margin-bottom: 10px;
+            padding: 5px;
+        }
+        .message {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat Application</h1>
+    <div id="chatbox"></div>
+    <input type="text" id="messageInput" placeholder="Type your message...">
+    <button id="sendButton">Send</button>
+
+    <script src="chat.js"></script>
+</body>
+<script>
+const chatbox = document.getElementById('chatbox');
+const messageInput = document.getElementById('messageInput');
+const sendButton = document.getElementById('sendButton');
+
+// Replace with your actual WebSocket server address
+const ws = new WebSocket('ws://localhost:8080'); // Example for a local server
+
+ws.onopen = () => {
+    console.log('WebSocket connection established.');
+};
+
+ws.onmessage = (event) => {
+    const messageData = JSON.parse(event.data);
+    displayMessage(messageData);
+};
+
+ws.onerror = (error) => {
+    console.error('WebSocket Error:', error);
+};
+
+ws.onclose = () => {
+    console.log('WebSocket connection closed.');
+};
+
+sendButton.onclick = () => {
+    sendMessage();
+};
+
+messageInput.onkeypress = (event) => {
+    if (event.key === 'Enter') {
+        sendMessage();
+    }
+};
+
+function sendMessage() {
+    const messageText = messageInput.value.trim();
+    if (messageText && ws.readyState === WebSocket.OPEN) {
+        const message = {
+            // You might want to include username/ID here
+            text: messageText,
+            timestamp: new Date().toISOString()
+        };
+        ws.send(JSON.stringify(message));
+        messageInput.value = '';
+    } else {
+        console.warn('Message input is empty or WebSocket is not connected.');
+    }
+}
+
+function displayMessage(message) {
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('message');
+    // Format timestamp for display if needed
+    const displayTimestamp = new Date(message.timestamp).toLocaleTimeString();
+    messageElement.innerHTML = `<strong>${message.sender || 'User'}:</strong> ${message.text} <small>(${displayTimestamp})</small>`;
+    chatbox.appendChild(messageElement);
+    chatbox.scrollTop = chatbox.scrollHeight; // Auto-scroll to the bottom
+}
+```
+
+**Backend Implementation Note:**
+
+A server-side application is required to manage WebSocket connections and broadcast messages to all connected clients. For example, using Node.js:
+
+```javascript
+// Example using Node.js with 'ws' library
+const WebSocket = require('ws');
+
+const wss = new WebSocket.Server({ port: 8080 });
+
+wss.on('connection', (ws) => {
+    console.log('Client connected');
+
+    ws.on('message', (message) => {
+        console.log(`Received message => ${message}`);
+        // Broadcast the message to all connected clients
+        wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+            }
+        });
+    });
+
+    ws.on('close', () => {
+        console.log('Client disconnected');
+    });
+
+    ws.send(JSON.stringify({ text: 'Welcome to the chat!', timestamp: new Date().toISOString() }));
+});
+
+console.log("Server started");
+</script>
+</html>
